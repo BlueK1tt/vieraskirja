@@ -1,7 +1,5 @@
 const http = require('http');
 const fs = require('fs');
-const { getBuiltinModule } = require('process');
-const { transferableAbortSignal } = require('util');
 
 var id = 0;
 var oldtime = null;
@@ -16,11 +14,11 @@ function timenow(){
         oldtime = time
         return time
     } else {
-        console.log(time)
-        console.log(timenow)
+        //console.log(time)
+        //console.log(timenow)
     }
     difference = (timenow - oldtime) / 1000
-    console.log(difference)
+    //console.log(difference)
     translatetime(difference)
     return
 }
@@ -35,8 +33,76 @@ function translatetime(difference){
     totaltime['hours'] = difference / 3600;
     totaltime['minutes'] = difference / 60;
     totaltime['seconds'] = difference;
-    console.log(totaltime)
-    return totaltime;
+    //console.log(totaltime)
+
+    //check from lowest to highest if any are empty and the print result
+    //need to convert to higher if over 60
+    var addday = 0;
+    var addhours = 0;
+    var addminute = 0;
+    var addseconds = 0;
+
+    if(totaltime.hours >= 59){
+        addday = Math.floor(totaltime.days)
+        //console.log("addday:"+addday)
+        addhours = addday * 60
+        
+    }
+    if(totaltime.minutes >= 59){
+        var addhour = Math.floor(totaltime.hours)
+        //console.log("addhour"+ addhour)
+        var addminutes = addhour * 60
+        //console.log("addminute:" + addminute)
+        
+    }
+    if(totaltime.seconds >= 59){
+        addminute = Math.floor(totaltime.minutes)
+        //console.log("addminute:"+addminute)
+        addseconds = addminute * 60
+        //console.log("addseconds:"+addseconds)        
+    } else{
+        //console.log("under minute")
+        
+    }
+    var setdays;
+    if(Math.floor(totaltime.days) == 0){
+        setdays = "";
+    } else {
+        setdays = Math.floor(totaltime.days)+":";
+    }
+    var sethours;
+    if(Math.floor(addhours) == 0){
+        sethours = "";
+    }if(Math.floor(addhours) < 10 && Math.floor(addhours) != 0){
+        sethours = "0"+Math.floor(addhours)+":";
+    } 
+    else {
+        sethours = Math.floor(addhours)+":";
+    }
+    var setminutes;
+    if(Math.floor(addminute) == 0){
+        setminutes = "";
+
+    } if(Math.floor(addminute) < 10 && Math.floor(addminute) != 0){
+        setminutes = "0"+Math.floor(addminute)+":"
+
+    }else {
+        setminutes = Math.floor(addminute)+":"
+    }
+    if(Math.floor(totaltime.seconds - addseconds) < 10 && Math.floor(totaltime.seconds - addseconds) != 0){
+        setseconds = "0"+Math.floor(totaltime.seconds - addseconds)
+    } else {
+        setseconds = Math.floor(totaltime.seconds - addseconds)
+    }
+    let finaltime = new Object()
+    finaltime['days'] = setdays;
+    finaltime['hours'] = sethours;
+    finaltime['minutes'] = setminutes;
+    finaltime['seconds'] = setseconds;
+    //console.log(finaltime)
+    returning = "Server has been online for:"+finaltime.days+finaltime.hours+finaltime.minutes+finaltime.seconds
+    console.log(returning);
+    return returning;
 }
 
 function getip(){
@@ -66,8 +132,9 @@ function entries(req){
 function elapsedtime(){
     //time between last and current request
     //get current time in one variable, at end of function, make old variable new variable
+    //just get the ammount of seconds server has been online into variable, use old - new comparrison
 
-    
+
 }
 function vieraskirja(newentry){
     timenow();
