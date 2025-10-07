@@ -1,9 +1,9 @@
 const http = require('http');
 const fs = require('fs');
-
 var id = 0;
 var oldtime = null;
 const time = new Date();
+var oldreqtime = null; //just as start when there is not last request
 
 function timenow(){
     
@@ -18,25 +18,23 @@ function timenow(){
         //console.log(timenow)
     }
     difference = (timenow - oldtime) / 1000
-    //console.log(difference)
     translatetime(difference)
-    return
+
+    //get current time and make it pretty for vieraskirja object
+    var strtime = JSON.stringify(timenow)
+    var timestr = strtime.slice(1,-1);
+    var onlytime = timestr.slice(10)
+    var cleantime = onlytime.slice(1,-5)
+    return cleantime
 }
 
 function translatetime(difference){
-    //function translates whole time into sections
-    //days, hours, minutes, seconds
-    //make it into object
-
     let totaltime = new Object();
     totaltime['days'] = difference / 86400;
     totaltime['hours'] = difference / 3600;
     totaltime['minutes'] = difference / 60;
     totaltime['seconds'] = difference;
-    //console.log(totaltime)
 
-    //check from lowest to highest if any are empty and the print result
-    //need to convert to higher if over 60
     var addday = 0;
     var addhours = 0;
     var addminute = 0;
@@ -44,22 +42,17 @@ function translatetime(difference){
 
     if(totaltime.hours >= 59){
         addday = Math.floor(totaltime.days)
-        //console.log("addday:"+addday)
         addhours = addday * 60
         
     }
     if(totaltime.minutes >= 59){
         var addhour = Math.floor(totaltime.hours)
-        //console.log("addhour"+ addhour)
         var addminutes = addhour * 60
-        //console.log("addminute:" + addminute)
         
     }
     if(totaltime.seconds >= 59){
         addminute = Math.floor(totaltime.minutes)
-        //console.log("addminute:"+addminute)
         addseconds = addminute * 60
-        //console.log("addseconds:"+addseconds)        
     } else{
         //console.log("under minute")
         
@@ -110,34 +103,51 @@ function getip(){
     console.log("new entry");
     http.get({'host': 'api.ipify.org', 'port': 80, 'path': '/'}, function(resp) {
         resp.on('data', function(ip) {
-            giveip(ip);
-            return
+            var b = Buffer.from(ip);
+            var s = b.toString('base64');
+            var decodedString = atob(s);
+            console.log(decodedString)
+            giveip(decodedString);
+            return;
         });
     });
     //return "ip"+ip;
 }
-function giveip(ip){
-    //console.log("myip:" + ip)
-    var res = "myip" +ip
-    return res
+
+function giveip(decodedString){
+    console.log("giveip");
+    console.log(decodedString)
+    var myip = decodedString
+    return myip
 }
+
+
+function elapsedtime(){
+    var newreqtime = new Date();
+    var timediff = (newreqtime - oldreqtime) / 1000;
+    reqtimediff = JSON.stringify(timediff) //turn object into string so can cut it
+    timestr = reqtimediff.slice(0,-2) //cut extra milliseconds off the end
+
+    oldreqtime = newreqtime
+    return timestr;
+}
+
 function entries(req){
     id++;
     let vieras = new Object();
-    vieras['id'] = id;
-    vieras['ip'] = req.headers.host;
+    getip();
+    var myip = giveip();
+    console.log(myip)
+
+    vieras['id'] = id
+    vieras['timestamp'] = timenow(); //get the current time, at the end of function
+    vieras['elapsedtime'] = elapsedtime();
+    vieras['ip'] = myip;
     vieras['source'] = req.headers['user-agent'];
     return vieras;
 }
-function elapsedtime(){
-    //time between last and current request
-    //get current time in one variable, at end of function, make old variable new variable
-    //just get the ammount of seconds server has been online into variable, use old - new comparrison
-
-
-}
 function vieraskirja(newentry){
-    timenow();
+    //timenow(); dont need this since already in object.vieras
     entrystr = JSON.stringify(newentry)
     cleanentry = entrystr.replaceAll('"', '')
     var rawdata1 = fs.readFileSync('./vieraskirja.JSON');
@@ -170,18 +180,14 @@ function vieraskirja(newentry){
 server = http.createServer(function(req, res){ //request and response handling    
     usragent = req.headers['user-agent'] //request user source
     host = req.headers.host
-    elapsedtime();
-
-    newentry = entries(req);
-    //console.log(req.headers)
-    //console.log(host); //ip
-
+    
+    var newentry = entries(req);    
     console.log(newentry);
-
+    
     writetosite = vieraskirja(newentry);
     if(writetosite == null){ //if the JSON file is empty
         res.write(toString(newentry))
-        getip()
+        console.log(getip())
         res.end();
     }else {
         res.write(JSON.stringify(writetosite)); //if JSON file already has data
