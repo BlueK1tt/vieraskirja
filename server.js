@@ -1,6 +1,5 @@
 const http = require('http');
 const fs = require('fs');
-const { type } = require('os');
 var id = 0;
 var saveid = 0;
 var oldtime = null;
@@ -12,8 +11,6 @@ function timenow(){
     
     //console.log("timenow")
     var timenow = new Date();
-    //var timenow = today.setHours(today.getHours() + 3)
-
     if(oldtime == null){
         oldtime = time
         return time
@@ -132,7 +129,6 @@ function elapsedtime(){
     totaltime['minutes'] = timestr / 60;
     totaltime['seconds'] = timestr;
     //console.log(totaltime);
-
     oldreqtime = newreqtime
     return timestr;
 }
@@ -141,7 +137,6 @@ function entries(req){
     id++;
     let vieras = new Object();
     var currenttime = timenow();
-    //console.log(typeof(currenttime))
 
     vieras['id'] = id
     vieras['timestamp'] = currenttime; //get the current time, at the end of function
@@ -155,15 +150,16 @@ function vieraskirja(newentry){
     entrystr = JSON.stringify(newentry)
     cleanentry = entrystr.replaceAll('"', '')
     var rawdata1 = fs.readFileSync('./vieraskirja.JSON');
-    fs.close;
 
-    if(rawdata1 == ""){
+    if(rawdata1 == "" ||rawdata1 == null){
         //check if file exists
         fs.writeFile('vieraskirja.JSON', entrystr, function(err){
             if(err) throw err;
         }); 
         fs.close;
     } else {
+        //need to check if JSON1 is empty
+        console.log(rawdata1)
         let json1 = JSON.parse(rawdata1)
 
         let datastr = JSON.stringify(json1);
@@ -185,32 +181,42 @@ function vieraskirja(newentry){
 function entrycompare(newentry){ //writetosite is the full object
     console.log("entrycompare")
     let oldvierasentry = null;
-    
-    //ignore id, timestamp and elapsedtime
+
+    //ignore id and elapsedtime
     let newvierasentry = new Object;
     newvierasentry['ip'] = newentry.ip;
     newvierasentry['source'] = newentry.source;
-
+    newvierasentry['timestamp'] = newentry.timestamp;
+    console.log(newvierasentry)
     var vieraslista = new Array;
     
     vieraslista = fs.readFileSync('./vieraslista.JSON')
     if(vieraslista == ""){ //JSON file is empty
         console.log("File is empty")
-        savevieras(newvierasentry);
-        return
+        var success1 = savevieras(newvierasentry);
+        console.log("success1"+success1)
+        if(success1 === false){
+            console.log("something is null")
+            return
+        }else{
+            return
+        }
     } else { //if the file is not empty, new data need to be "appended"
+        console.log("entrycompare 2")
         console.log(vieraslista)
-        //pull entries from savevieras and cycle trying to match to all.
         vieraslista = fs.readFileSync('./vieraslista.JSON');
         fs.close;
-        //need to match first the ip
-        //if ip is found, match the source
-        //if source is not same, create new enntry of source to the ip
-    
+ 
         //need to do object match
         if(oldvierasentry != newvierasentry){ //if doesnt match at all
-    
-            savevieras(newentry); //completely new entry
+            var success2 = savevieras(newentry); //completely new entry
+            console.log("success2"+success2)
+            if(success2 === false){
+                console.log("savevieras")
+                return
+            }else{
+                return
+            }
         }
         //need seperate if, when its old ip, but new source
         //and need to call function to just update the source of the object logged
@@ -219,8 +225,6 @@ function entrycompare(newentry){ //writetosite is the full object
             //the entry is already logged, so ignore
             return;
         }
-    
-    
         //in case doesnt match, need to call savevieras
     }
 }
@@ -233,22 +237,45 @@ function savevieras(newvierasentry){ //completely new entry
     saveid ++; //starts with 0, gets +1 every time function is called
     
     //function to log all "vieras" entries into JSON file
-
-    vieraslista = fs.readFileSync('./vieraslista.JSON');
-    if(vieraslista == ""){ //JSON file is empty
-        //need start and end of the object for future
-        //writing first entry into the file
-
+    if(!newvierasentry.timestamp || !newvierasentry.ip || newvierasentry.source){
+        console.log("something is null")
+        return false
     } else {
-        //need to 
-    }
-    //write and push clean new object entry
-    vieraslista.push({id:saveid, ip:newentry.ip, source:newentry.source});
-    //need to open JSON with FS,
-    //add entry to the end
-    fs.writeFile('./vieraslista.JSON')
-    fs.close;
+        vieraslista = fs.readFileSync('./vieraslista.JSON');
+        if(vieraslista == ""){ //JSON file is empty
+            //need start and end of the object for future
+            //writing first entry into the file
+            var vierasarr = [saveid, newvierasentry.timestamp, newvierasentry.ip, newvierasentry.source]
+            fs.writeFile('./vieraslista.JSON', JSON.stringify(vierasarr),'utf-8', function(error){
+                if(error){
+                    console.log(error);
+                };
+                return true;
+            });
+            fs.close;
+            return true;
+        } else {
+            //need to get the existing JSON into string, then add the new data into it
+            let existingfile = fs.readFileSync('./vieraslista.JSON')
+            let json1 = JSON.parse(existingfile)
+            console.log(json1)
 
+            //need to match first the ip
+            //if ip is found, match the source
+            //if source is not same, create new enntry of source to the ip
+    /*
+            var vierasarr = [saveid, newvierasentry.ip, newvierasentry.source]
+            fs.writeFile('./vieraslista.JSON', JSON.stringify(vierasarr),'utf-8', function(error){
+                if(error){
+                    console.log(error);
+                };
+                return;
+            });
+            fs.close;
+            return; */
+        }
+        return true
+    }
 } 
 server = http.createServer(function(req, res){ //request and response handling    
     usragent = req.headers['user-agent'] //request user source
@@ -258,6 +285,7 @@ server = http.createServer(function(req, res){ //request and response handling
     console.log(newentry);
     
     writetosite = vieraskirja(newentry);
+    console.log("newentry"+newentry)
     entrycompare(newentry);
 
     if(writetosite == null){ //if the JSON file is empty
