@@ -1,5 +1,6 @@
 const http = require('http');
 const fs = require('fs');
+const { match } = require('assert');
 var id = 0;
 var saveid = 0;
 var oldtime = null;
@@ -150,16 +151,18 @@ function vieraskirja(newentry){
     entrystr = JSON.stringify(newentry)
     cleanentry = entrystr.replaceAll('"', '')
     var rawdata1 = fs.readFileSync('./vieraskirja.JSON');
-
-    if(rawdata1 == "" ||rawdata1 == null){
+    
+    if(!rawdata1.length){
         //check if file exists
+        console.log("JSON is empty")
         fs.writeFile('vieraskirja.JSON', entrystr, function(err){
             if(err) throw err;
         }); 
         fs.close;
+        return;
     } else {
+        console.log("JSON has data")
         //need to check if JSON1 is empty
-        console.log(rawdata1)
         let json1 = JSON.parse(rawdata1)
 
         let datastr = JSON.stringify(json1);
@@ -188,10 +191,10 @@ function entrycompare(newentry){ //writetosite is the full object
     newvierasentry['source'] = newentry.source;
     newvierasentry['timestamp'] = newentry.timestamp;
     console.log(newvierasentry)
-    var vieraslista = new Array;
+    var vieraslista1 = new Array;
     
-    vieraslista = fs.readFileSync('./vieraslista.JSON')
-    if(vieraslista == ""){ //JSON file is empty
+    vieraslista1 = fs.readFileSync('./vieraslista.JSON')
+    if(!vieraslista1.length){ //JSON file is empty
         console.log("File is empty")
         var success1 = savevieras(newvierasentry);
         console.log("success1"+success1)
@@ -203,50 +206,56 @@ function entrycompare(newentry){ //writetosite is the full object
         }
     } else { //if the file is not empty, new data need to be "appended"
         console.log("entrycompare 2")
-        console.log(vieraslista)
+        /*
         vieraslista = fs.readFileSync('./vieraslista.JSON');
-        fs.close;
+        fs.close;*/
  
         //need to do object match
-        if(oldvierasentry != newvierasentry){ //if doesnt match at all
-            var success2 = savevieras(newentry); //completely new entry
+        if(oldvierasentry !== newvierasentry){ //if doesnt match at all
+            var success2 = savevieras(newvierasentry); //completely new entry
             console.log("success2"+success2)
             if(success2 === false){
-                console.log("savevieras")
+                console.log("savevieras new entry")
                 return
             }else{
                 return
             }
+            
+            //need seperate if, when its old ip, but new source
+            //and need to call function to just update the source of the object logged
         }
-        //need seperate if, when its old ip, but new source
-        //and need to call function to just update the source of the object logged
-    
         else{
             //the entry is already logged, so ignore
+            console.log("entry already logged")
+            oldvierasentry = newvierasentry;
             return;
         }
         //in case doesnt match, need to call savevieras
     }
 }
-
 function savevieras(newvierasentry){ //completely new entry
     console.log("savevieras")
+    saveid ++; //starts with 0, gets +1 every time function is called
 
     var vieraslista = new Array;
-    console.log(vieraslista)
-    saveid ++; //starts with 0, gets +1 every time function is called
+    vieraslista = fs.readFileSync('./vieraslista.JSON');
+    stringvieraslista = vieraslista.toString('utf8')
+    if(!vieraslista.length){
+        console.log("vieralista is empty")
+    } else {
+        console.log("vieraslista:"+vieraslista.toString('utf8'))
+    }
+    fs.close;
     
     //function to log all "vieras" entries into JSON file
-    if(!newvierasentry.timestamp || !newvierasentry.ip || newvierasentry.source){
+    if(!newvierasentry.timestamp || !newvierasentry.ip || !newvierasentry.source){
         console.log("something is null")
         return false
     } else {
-        vieraslista = fs.readFileSync('./vieraslista.JSON');
-        if(vieraslista == ""){ //JSON file is empty
-            //need start and end of the object for future
-            //writing first entry into the file
-            var vierasarr = [saveid, newvierasentry.timestamp, newvierasentry.ip, newvierasentry.source]
-            fs.writeFile('./vieraslista.JSON', JSON.stringify(vierasarr),'utf-8', function(error){
+        console.log("nothing is null")
+        if(!vieraslista.length){ //JSON file is empty
+            var vierasarr1 = JSON.stringify({"ip":newvierasentry.ip,"timestamp":newvierasentry.timestamp,"source":newvierasentry.source}, null, "\t");
+            fs.writeFile('./vieraslista.JSON', vierasarr1,'utf-8', function(error){
                 if(error){
                     console.log(error);
                 };
@@ -255,28 +264,48 @@ function savevieras(newvierasentry){ //completely new entry
             fs.close;
             return true;
         } else {
+            var existingfile = []
             //need to get the existing JSON into string, then add the new data into it
-            let existingfile = fs.readFileSync('./vieraslista.JSON')
-            let json1 = JSON.parse(existingfile)
+            existingfile = fs.readFileSync('./vieraslista.JSON')
+            var json1 = JSON.parse(existingfile) //is already an array
+            fs.close;
+            console.log("json1")
             console.log(json1)
 
-            //need to match first the ip
-            //if ip is found, match the source
-            //if source is not same, create new enntry of source to the ip
-    /*
-            var vierasarr = [saveid, newvierasentry.ip, newvierasentry.source]
-            fs.writeFile('./vieraslista.JSON', JSON.stringify(vierasarr),'utf-8', function(error){
-                if(error){
-                    console.log(error);
-                };
-                return;
-            });
-            fs.close;
-            return; */
+            if(stringvieraslista.includes(newvierasentry.ip)){ //match all data from JSON to newentry ip
+                console.log("ip match")
+
+                //find matching ip and get the whole object
+                var matchedentry = stringvieraslista.filter((ip) => ip.includes === newvierasentry.ip)
+                console.log("matchedentry"+matchedentry)
+                var addnewtimestamp = newvierasentry.timestamp;
+                console.log(addnewtimestamp)
+
+                //writefile to JSON, psuh new timestamp, check if same source is found
+                var old = JSON.stringify(matchedentry).replace(addnewtimestamp, matchedentry.timestamp)
+                console.log(old)
+                var newarray = JSON.parse(old)
+                console.log(newarray)
+                return true
+            } else {
+                console.log("no match")
+                var vierasarr2 = JSON.stringify({"ip":newvierasentry.ip,"timestamp":newvierasentry.timestamp,"source":newvierasentry.source}, null, "\t");
+                fs.writeFile('./vieraslista.JSON',vierasarr2,'utf-8', function(error){
+                    if(error){
+                        console.log(error);
+                    };
+                    return;
+                });
+                fs.close;
+                return true; 
+            }
+            
+            return
         }
         return true
     }
 } 
+
 server = http.createServer(function(req, res){ //request and response handling    
     usragent = req.headers['user-agent'] //request user source
     host = req.headers.host
@@ -285,7 +314,7 @@ server = http.createServer(function(req, res){ //request and response handling
     console.log(newentry);
     
     writetosite = vieraskirja(newentry);
-    console.log("newentry"+newentry)
+    //console.log(newentry)
     entrycompare(newentry);
 
     if(writetosite == null){ //if the JSON file is empty
@@ -296,8 +325,12 @@ server = http.createServer(function(req, res){ //request and response handling
         res.write(JSON.stringify(writetosite)); //if JSON file already has data
         res.end();
     }
+    console.log("----------")
 });
 
 server.listen(3000, () => {
     console.log("server starting"+ " 3000 " + timenow())    
 });
+
+//make ip based log in system
+//can save "settings" only for the spesific ip, and can get the ip from the API
